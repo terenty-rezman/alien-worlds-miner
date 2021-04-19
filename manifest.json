@@ -1,0 +1,20 @@
+{
+    "manifest_version": 2,
+    "name": "alien_worlds_miner",
+    "version": "0.1",
+    "content_scripts": [
+        {
+            "matches": [
+                "https://play.alienworlds.io/*",
+                "https://all-access.wax.io/cloud-wallet/signing/"
+            ],
+            "js": [
+                "content_script.js"
+            ]
+        }
+    ],
+    "browser_action": {
+        "default_icon": "icon.png"
+    },
+    "web_accessible_resources": ["miner.js"]
+}
