@@ -1,6 +1,23 @@
-miner_events = new EventTarget();
+const miner = {
+    events: new EventTarget(),
+    is_mining: false,
 
-is_mining = false;
+    print: function () {
+        console.log(...arguments);
+        if (this.is_mining) {
+            const info = document.querySelector(".miner-ui");
+            let args = [...arguments];
+            let string = "";
+            for (arg of args) {
+                try {
+                    string += arg.toString() + " ";
+                }
+                catch { }
+            }
+            info.textContent = string;
+        }
+    }
+}
 
 // intercept console.log to make it possible to await on some console messages
 window.old_log = window.console.log;
@@ -9,20 +26,7 @@ window.console.log = function (msg) {
     window.old_log.apply(window, arguments);
 
     const event = new CustomEvent("console_log", { detail: msg });
-    miner_events.dispatchEvent(event);
-
-    if (is_mining) {
-        const info = document.querySelector(".miner-ui");
-        let args = Array.from(arguments);
-        let string = "";
-        for (arg of args) {
-            try {
-                string += arg.toString() + " ";
-            }
-            catch { }
-        }
-        info.textContent = string;
-    }
+    miner.events.dispatchEvent(event);
 }
 
 var wait_for_msg = async function (msg) {
@@ -31,13 +35,13 @@ var wait_for_msg = async function (msg) {
             const message = event.detail;
             if (typeof message === 'string' || message instanceof String) {
                 if (message.includes(msg)) {
-                    miner_events.removeEventListener("console_log", handler);
+                    miner.events.removeEventListener("console_log", handler);
                     resolve();
                 }
             }
         }
 
-        miner_events.addEventListener("console_log", handler);
+        miner.events.addEventListener("console_log", handler);
     })
 }
 
@@ -48,7 +52,7 @@ var miner_init_ui = function () {
         `
         .miner-ui {
             position: absolute;
-            margin-bottom: 20px;
+            margin-bottom: 0px;
             line-height: 60px;
             font-weight: bold;
             padding: 0 40px;
@@ -65,7 +69,7 @@ var miner_init_ui = function () {
         }
 
         .miner-info {
-            background: #DEAE51;
+            background: #fbc02d;
             max-width: 800px;
             overflow: hidden;
             white-space: nowrap;
@@ -100,10 +104,10 @@ var miner_init_ui = function () {
 
     // 3. Add event handler
     button.addEventListener("click", function () {
-        if (is_mining == false) {
+        if (miner.is_mining == false) {
             button.classList.remove("miner-button")
             button.classList.add("miner-info");
-            is_mining = true;
+            miner.is_mining = true;
             my_mine_loop();
         }
     });
@@ -113,14 +117,43 @@ var miner_init_ui = function () {
 var BAG = [1, 2, 3];
 
 var my_set_bag = async function () {
+    var ACCOUNT = wax.userAccount;
     bag_str = JSON.stringify({ items: BAG });
-    console.log("SETTING BAG")
+    miner.print("SETTING BAG")
     await server_setBag(ACCOUNT, bag_str);
-    console.log("BAG SET")
+    miner.print("BAG SET")
 }
 
 var my_sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+var start_timer = function () {
+    const start = Date.now();
+    return function () {
+        return Date.now() - start;
+    }
+}
+
+var countdown = async function (ms, msg) {
+    const elapsed = start_timer();
+    while (elapsed() < ms) {
+        const ms_left = Math.floor((ms - elapsed()));
+        miner.print(msg, ms_to_time(ms_left));
+        await my_sleep(1 * 1000);
+    }
+}
+
+function ms_to_time(duration) {
+    let seconds = Math.floor((duration / 1000) % 60);
+    let minutes = Math.floor((duration / (1000 * 60)) % 60);
+    let hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+
+    hours = (hours < 10) ? "0" + hours : hours;
+    minutes = (minutes < 10) ? "0" + minutes : minutes;
+    seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+    return hours + ":" + minutes + ":" + seconds;
 }
 
 var my_open = function () {
@@ -137,19 +170,15 @@ var monkey_patch_popup = function () {
     window.old_open = window.open;
     window.open = my_open;
 
-    console.log('window.open monkey patched')
+    miner.print('window.open monkey patched')
 }
 
-var wait_popup_closed = async function () {
-    while (true) {
-        if (window.last_popup) {
-            if (window.last_popup.closed) {
-                window.last_popup = null;
-                return;
-            }
+var close_last_popup = function () {
+    if (window.last_popup) {
+        if (window.last_popup.closed == false) {
+            window.last_popup.close();
         }
-
-        await my_sleep(2 * 1000); // sleep untill popup appears
+        window.last_popup = null;
     }
 }
 
@@ -173,7 +202,7 @@ var my_mine = function (account) {
     });
 }
 
-var my_claim = function (data) {
+var my_claim = async function (data) {
     return new Promise((resolve, reject) => {
         var mine_work = JSON.parse(data);
         try {
@@ -227,9 +256,6 @@ var my_claim = function (data) {
                 reject();
             }
             );
-
-            wait_popup_closed();
-
         } catch (error) {
             unityInstance.SendMessage('ErrorHandler', 'Server_Response_SetErrorData', error.message);
             reject();
@@ -237,7 +263,7 @@ var my_claim = function (data) {
     });
 }
 
-async function retry_after_timeout(fn, timeout) {
+async function retry_on_timeout(fn, do_when_timeount, timeout) {
     while (true) {
         try {
             let result = await Promise.race([
@@ -251,9 +277,29 @@ async function retry_after_timeout(fn, timeout) {
             if (err !== "timeout")
                 throw err;
 
-            console.log(err);
-            console.log("RETRYING FUNCTION", fn.name);
+            do_when_timeount();
+            miner.print(err);
+            miner.print("RETRYING FUNCTION", fn.name);
         }
+
+        await my_sleep(1 * 1000);
+    }
+}
+
+async function retry_on_reject(fn, reject_vallue) {
+    while (true) {
+        try {
+            const result = await fn();
+            return result;
+        }
+        catch (err) {
+            if (reject_vallue && err !== reject_vallue)
+                throw err;
+
+            miner.print(err);
+            miner.print("RETRYING FUNCTION", fn.name);
+        }
+        await my_sleep(1 * 1000);
     }
 }
 
@@ -264,19 +310,33 @@ var my_mine_loop = async function () {
 
     while (true) {
         try {
-            let delay = await getMineDelay(ACCOUNT);
-            console.log("WATING FOR MINE for", delay / 1000);
-            await my_sleep(delay);
-            await my_sleep(3 * 1000); // sleep additional secs
-            console.log("START MINING");
-            mine_work = await my_mine(ACCOUNT);
-            console.log("MINING REUSLT", mine_work);
-            await retry_after_timeout(my_claim.bind(this, mine_work), 3 * 60 * 1000);
-            console.log("DONE");
+            let mine_work = localStorage.getItem("miner_last_mine_data");
+
+            // mine if unclaimed prev mine data
+            if (!mine_work) {
+                let delay = await getMineDelay(ACCOUNT);
+
+                if (delay > 0)
+                    await countdown(delay, "WATING FOR MINE");
+
+                await my_sleep(3 * 1000); // sleep additional secs
+                miner.print("MINING");
+                mine_work = await my_mine(ACCOUNT);
+                localStorage.setItem("miner_last_mine_data", mine_work);
+            }
+
+            miner.print("CLAIMING RESULT");
+            await retry_on_timeout(my_claim.bind(this, mine_work), close_last_popup, 5 * 60 * 1000);
+
+            localStorage.removeItem("miner_last_mine_data");
+
+            miner.print("DONE CLAIMING");
             await my_sleep(3 * 1000); // sleep additional secs
         }
         catch (error) {
-            console.log("error");
+            miner.print(error);
+            localStorage.removeItem("miner_last_mine_data");
+            await my_sleep(3 * 1000);
         }
     }
 }
