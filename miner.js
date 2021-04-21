@@ -1,11 +1,18 @@
 const miner = {
     events: new EventTarget(),
     is_mining: false,
+    ui: {
+        set_statusbar: function (msg) {
+            this.statusbar.textContent = msg;
+        }
+
+        /* items added here at miner_init_ui() */
+    },
 
     print: function () {
         console.log(...arguments);
         if (this.is_mining) {
-            const info = document.querySelector(".miner-ui");
+            const info = this.ui.info;
             let args = [...arguments];
             let string = "";
             for (arg of args) {
@@ -50,8 +57,47 @@ var miner_init_ui = function () {
     const style = document.createElement('style');
     style.innerHTML =
         `
-        .miner-ui {
+        .miner-ui-container {
             position: absolute;
+            margins: 0px;
+            border: none;
+            outline: none;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+
+            pointer-events: none;
+
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: flex-start;
+        }
+
+        .miner-statusbar {
+            padding: 5px 10px;
+            color: #bbb;
+            background: #424242ee;
+            align-self: stretch;
+            text-weight: bold;
+        }
+
+        .miner-bag {
+            color: rgba(255, 255, 255, 0.7);
+            background: #2C2F33;
+            padding: 5px 10px;
+
+            pointer-events: auto;
+            cursor: pointer;
+
+            border: none;
+            outline: none;
+        }
+
+        .miner-button {
+            pointer-events: auto;
+            cursor: pointer;
+
             margin-bottom: 0px;
             line-height: 60px;
             font-weight: bold;
@@ -59,12 +105,10 @@ var miner_init_ui = function () {
 
             border: none;
             outline: none;
-            left: 0;
-            bottom: 0;
             transition: background 0.2s
         }
 
-        .miner-button {
+        .miner-bckg-red {
             background: #e91e63;
         }
 
@@ -91,21 +135,56 @@ var miner_init_ui = function () {
     // Insert our new styles before the first script tag
     body.appendChild(style);
 
-    // 1. Create the button
-    const button = document.createElement("button");
-    button.classList.add("miner-ui");
-    button.classList.add("miner-button");
+    // create miner ui container
+    const ui = document.createElement("div");
+    ui.classList.add("miner-ui-container");
 
-    button.innerHTML = "start mining";
-
-    // append somewhere
+    // append container over webgl viewport
     const webgl_content = document.querySelector(".webgl-content");
-    webgl_content.appendChild(button);
+    webgl_content.appendChild(ui);
+
+    // create status bar
+    const statusbar = document.createElement("div");
+    statusbar.classList.add("miner-statusbar");
+    statusbar.textContent = "alien-worlds-miner";
+    ui.appendChild(statusbar);
+    miner.ui.statusbar = statusbar;
+
+    // create bag bar
+    const bag = document.createElement("div");
+    bag.classList.add("miner-bag");
+    bag.textContent = "bag: click to refresh";
+    ui.appendChild(bag);
+    miner.ui.bag = bag;
+
+    bag.addEventListener("click", async function () {
+        const ACCOUNT = wax.userAccount;
+        const items = await my_getBag(ACCOUNT);
+        let bag_str = "bag: [";
+
+        for (item of items) {
+            bag_str += item.asset_id + ", "
+        }
+        bag_str = bag_str.slice(0, -2);
+
+        bag_str += "] click to refresh";
+        bag.textContent = bag_str;
+    });
+
+    // create the button
+    const button = document.createElement("button");
+    button.classList.add("miner-button");
+    button.classList.add("miner-bckg-red");
+
+    button.textContent = "start mining";
+
+    ui.appendChild(button);
+    miner.ui.info = button;
 
     // 3. Add event handler
     button.addEventListener("click", function () {
         if (miner.is_mining == false) {
-            button.classList.remove("miner-button")
+            button.classList.remove("miner-bckg-red")
             button.classList.add("miner-info");
             miner.is_mining = true;
             my_mine_loop();
@@ -142,6 +221,23 @@ var countdown = async function (ms, msg) {
         miner.print(msg, ms_to_time(ms_left));
         await my_sleep(1 * 1000);
     }
+}
+
+var uptime = function (ms_elapsed) {
+    let secs = Math.floor(ms_elapsed / 1000); // secs
+
+    const days = Math.floor(secs / (60 * 60 * 24));
+    secs -= days * (60 * 60 * 24);
+
+    const hours = Math.floor(secs / (60 * 60));
+    secs -= hours * (60 * 60);
+
+    const mins = Math.floor(secs / 60);
+    secs -= mins * (60);
+
+    secs = Math.floor(secs);
+
+    return `${days} days, ${hours} hours, ${mins} mins, ${secs} seconds`;
 }
 
 function ms_to_time(duration) {
@@ -253,14 +349,47 @@ var my_claim = async function (data) {
             }
             ).catch((err) => {
                 unityInstance.SendMessage('ErrorHandler', 'Server_Response_SetErrorData', err.message);
-                reject();
+                reject(err);
             }
             );
         } catch (error) {
             unityInstance.SendMessage('ErrorHandler', 'Server_Response_SetErrorData', error.message);
-            reject();
+            reject(err);
         }
     });
+}
+
+async function my_getBalance(account) {
+    try {
+        var data = await getBalance(account, wax.api.rpc);
+        unityInstance.SendMessage('Controller', 'Server_Response_GetBalance', data);
+        let number = parseFloat(data);
+        return number;
+    } catch (error) {
+        unityInstance.SendMessage(
+            'ErrorHandler',
+            'Server_Response_SetErrorData',
+            error.message
+        );
+    }
+}
+
+async function my_getBag(account) {
+    try {
+        var data = await getBag(mining_account, account, wax.api.rpc, aa_api);
+        unityInstance.SendMessage(
+            'Controller',
+            'Server_Response_GetBag',
+            JSON.stringify(data)
+        );
+        return data;
+    } catch (error) {
+        unityInstance.SendMessage(
+            'ErrorHandler',
+            'Server_Response_SetErrorData',
+            error.message
+        );
+    }
 }
 
 async function retry_on_timeout(fn, do_when_timeount, timeout) {
@@ -308,6 +437,12 @@ var my_mine_loop = async function () {
 
     monkey_patch_popup();
 
+    const elapsed = start_timer();
+    let start_balance = 0;
+
+    try { start_balance = await my_getBalance(ACCOUNT); }
+    catch { }
+
     while (true) {
         try {
             let mine_work = localStorage.getItem("miner_last_mine_data");
@@ -331,11 +466,28 @@ var my_mine_loop = async function () {
             localStorage.removeItem("miner_last_mine_data");
 
             miner.print("DONE CLAIMING");
+
+            const uptime_ = uptime(elapsed());
+            const balance = await my_getBalance(ACCOUNT);
+            const earned = (balance - start_balance).toFixed(3);
+            const efficiency = (earned / elapsed() * 60 * 60 * 1000).toFixed(3); // TML/hour
+
+            miner.ui.set_statusbar(`balance: ${balance} TLM | total earned: ${earned} TLM | efficiency: ${efficiency} TLM/hour | uptime: ${uptime_}`);
+
             await my_sleep(3 * 1000); // sleep additional secs
         }
         catch (error) {
-            miner.print(error);
             localStorage.removeItem("miner_last_mine_data");
+
+            const alien_error = error?.json?.error;
+            if (alien_error && error?.json?.error?.name === "tx_cpu_usage_exceeded") {
+                miner.print(alien_error?.what || alien_error);
+                await my_sleep(5 * 1000); // sleep additional secs
+                await countdown(10 * 60 * 1000, "CPU cooldown");
+                continue;
+            }
+
+            miner.print(error);
             await my_sleep(3 * 1000);
         }
     }
@@ -346,4 +498,5 @@ var main = async function () {
     miner_init_ui();
 }
 
+//miner_init_ui();
 main();
