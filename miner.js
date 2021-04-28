@@ -94,11 +94,8 @@ var miner_init_ui = function () {
             outline: none;
         }
 
-        .miner-button {
-            pointer-events: auto;
-            cursor: pointer;
-
-            margin-bottom: 0px;
+        .miner-widget {
+            margins: 0px;
             line-height: 60px;
             font-weight: bold;
             padding: 0 40px;
@@ -108,7 +105,9 @@ var miner_init_ui = function () {
             transition: background 0.2s
         }
 
-        .miner-bckg-red {
+        .miner-button {
+            pointer-events: auto;
+            cursor: pointer;
             background: #e91e63;
         }
 
@@ -173,8 +172,8 @@ var miner_init_ui = function () {
 
     // create the button
     const button = document.createElement("button");
+    button.classList.add("miner-widget");
     button.classList.add("miner-button");
-    button.classList.add("miner-bckg-red");
 
     button.textContent = "start mining";
 
@@ -184,7 +183,7 @@ var miner_init_ui = function () {
     // 3. Add event handler
     button.addEventListener("click", function () {
         if (miner.is_mining == false) {
-            button.classList.remove("miner-bckg-red")
+            button.classList.remove("miner-button")
             button.classList.add("miner-info");
             miner.is_mining = true;
             my_mine_loop();
@@ -284,10 +283,33 @@ var test_popup_close = async function () {
     console.log("POPUP CLOSED !")
 }
 
+var my_background_mine = async (account) => {
+    return new Promise(async (resolve, reject) => {
+        let bagDifficulty = await getBagDifficulty(account);
+        bagDifficulty = parseInt(bagDifficulty) || 0; // [!]
+        
+        let landDifficulty = await getLandDifficulty(account);
+        landDifficulty = parseInt(landDifficulty) || 0; // [!]
+
+        const difficulty = bagDifficulty + landDifficulty;
+        console.log('difficulty', difficulty);
+
+        console.log('start doWork = ' + Date.now());
+        const last_mine_tx = await lastMineTx(mining_account, account, wax.api.rpc);
+
+        doWorkWorker({ mining_account, account, difficulty, last_mine_tx }).then(
+            (mine_work) => {
+                console.log('end doWork = ' + Date.now());
+                resolve(mine_work);
+            }
+        );
+    });
+};
+
 var my_mine = function (account) {
     return new Promise((resolve, reject) => {
         try {
-            background_mine(account).then((mine_work) => {
+            my_background_mine(account).then((mine_work) => {
                 unityInstance.SendMessage('Controller', 'Server_Response_Mine', JSON.stringify(mine_work));
                 resolve(JSON.stringify(mine_work));
             });
@@ -447,18 +469,19 @@ var my_mine_loop = async function () {
         try {
             let mine_work = localStorage.getItem("miner_last_mine_data");
 
-            // mine if unclaimed prev mine data
+            // mine first then wait on timeout
             if (!mine_work) {
-                let delay = await getMineDelay(ACCOUNT);
-
-                if (delay > 0)
-                    await countdown(delay, "WATING FOR MINE");
-
-                await my_sleep(3 * 1000); // sleep additional secs
                 miner.print("MINING");
                 mine_work = await my_mine(ACCOUNT);
                 localStorage.setItem("miner_last_mine_data", mine_work);
             }
+
+            let delay = await getMineDelay(ACCOUNT);
+
+            if (delay > 0)
+                await countdown(delay, "wating for mine timeout");
+
+            await countdown(3 * 1000, "waiting a little");
 
             miner.print("CLAIMING RESULT");
             await retry_on_timeout(my_claim.bind(this, mine_work), close_last_popup, 5 * 60 * 1000);
@@ -474,7 +497,7 @@ var my_mine_loop = async function () {
 
             miner.ui.set_statusbar(`balance: ${balance} TLM | total earned: ${earned} TLM | efficiency: ${efficiency} TLM/hour | uptime: ${uptime_}`);
 
-            await my_sleep(3 * 1000); // sleep additional secs
+            await countdown(3 * 1000, "waiting a little"); // sleep additional secs
         }
         catch (error) {
             localStorage.removeItem("miner_last_mine_data");
