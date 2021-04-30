@@ -461,9 +461,21 @@ var my_mine_loop = async function () {
 
     const elapsed = start_timer();
     let start_balance = 0;
+    let cpu_fails = 0;
 
     try { start_balance = await my_getBalance(ACCOUNT); }
     catch { }
+
+    const print_status = async () => {
+        const uptime_ = uptime(elapsed());
+        const balance = await my_getBalance(ACCOUNT);
+        const earned = (balance - start_balance).toFixed(3);
+        const efficiency = (earned / elapsed() * 60 * 60 * 1000).toFixed(3); // TML/hour
+
+        miner.ui.set_statusbar(
+            `balance: ${balance} TLM | total earned: ${earned} TLM | efficiency: ${efficiency} TLM/hour | uptime: ${uptime_} | cpu fails: ${cpu_fails}`
+        );
+    }
 
     while (true) {
         try {
@@ -490,12 +502,7 @@ var my_mine_loop = async function () {
 
             miner.print("DONE CLAIMING");
 
-            const uptime_ = uptime(elapsed());
-            const balance = await my_getBalance(ACCOUNT);
-            const earned = (balance - start_balance).toFixed(3);
-            const efficiency = (earned / elapsed() * 60 * 60 * 1000).toFixed(3); // TML/hour
-
-            miner.ui.set_statusbar(`balance: ${balance} TLM | total earned: ${earned} TLM | efficiency: ${efficiency} TLM/hour | uptime: ${uptime_}`);
+            print_status();
 
             await countdown(3 * 1000, "waiting a little"); // sleep additional secs
         }
@@ -505,8 +512,9 @@ var my_mine_loop = async function () {
             const alien_error = error?.json?.error;
             if (alien_error && error?.json?.error?.name === "tx_cpu_usage_exceeded") {
                 miner.print(alien_error?.what || alien_error);
-                await my_sleep(5 * 1000); // sleep additional secs
-                await countdown(10 * 60 * 1000, "CPU cooldown");
+                cpu_fails++;
+                print_status();
+                await countdown(20 * 60 * 1000, "CPU cooldown");
                 continue;
             }
 
