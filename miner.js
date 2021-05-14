@@ -10,7 +10,7 @@ const miner = {
     },
 
     print: function () {
-        console.log(...arguments);
+        // console.log(...arguments);
         if (this.is_mining) {
             const info = this.ui.info;
             let args = [...arguments];
@@ -206,6 +206,12 @@ var my_sleep = function (ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function rand_int(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min; // max not included
+}
+
 var start_timer = function () {
     const start = Date.now();
     return function () {
@@ -220,6 +226,11 @@ var countdown = async function (ms, msg) {
         miner.print(msg, ms_to_time(ms_left));
         await my_sleep(1 * 1000);
     }
+}
+
+var sleep_random = async function(min_ms, max_ms) {
+    const sleep_ms = rand_int(min_ms, max_ms);
+    return await countdown(sleep_ms, "RANDOM SLEEP");
 }
 
 var uptime = function (ms_elapsed) {
@@ -437,6 +448,16 @@ async function retry_on_timeout(fn, do_when_timeount, timeout) {
     }
 }
 
+
+async function throw_on_timeout(fn, what, timeout) {
+    let result = await Promise.race([
+        fn(),
+        new Promise((res, rej) => setTimeout(rej.bind(this, what), timeout))
+    ]);
+
+    return result;
+}
+
 async function retry_on_reject(fn, reject_vallue) {
     while (true) {
         try {
@@ -461,6 +482,7 @@ var my_mine_loop = async function () {
 
     const elapsed = start_timer();
     let start_balance = 0;
+    let mine_count = 0;
     let cpu_fails = 0;
 
     try { start_balance = await my_getBalance(ACCOUNT); }
@@ -473,48 +495,42 @@ var my_mine_loop = async function () {
         const efficiency = (earned / elapsed() * 60 * 60 * 1000).toFixed(3); // TML/hour
 
         miner.ui.set_statusbar(
-            `balance: ${balance} TLM | total earned: ${earned} TLM | efficiency: ${efficiency} TLM/hour | uptime: ${uptime_} | cpu fails: ${cpu_fails}`
+            `balance: ${balance} TLM | total earned: ${earned} TLM | efficiency: ${efficiency} TLM/hour | uptime: ${uptime_} | mine count: ${mine_count} | cpu fails: ${cpu_fails}`
         );
     }
 
     while (true) {
         try {
-            let mine_work = localStorage.getItem("miner_last_mine_data");
-
-            // mine first then wait on timeout
-            if (!mine_work) {
-                miner.print("MINING");
-                mine_work = await my_mine(ACCOUNT);
-                localStorage.setItem("miner_last_mine_data", mine_work);
-            }
-
             let delay = await getMineDelay(ACCOUNT);
 
             if (delay > 0)
                 await countdown(delay, "wating for mine timeout");
 
-            await countdown(3 * 1000, "waiting a little");
+            miner.print("MINING");
+            mine_work = await throw_on_timeout(
+                my_mine.bind(this, ACCOUNT), "timeout on mining", 3 * 60 * 1000
+            );
+
+            await sleep_random(0, 10 * 1000); // sleep additional random secs
 
             miner.print("CLAIMING RESULT");
-            await retry_on_timeout(my_claim.bind(this, mine_work), close_last_popup, 5 * 60 * 1000);
-
-            localStorage.removeItem("miner_last_mine_data");
+            await retry_on_timeout(my_claim.bind(this, mine_work), close_last_popup, 3 * 60 * 1000);
 
             miner.print("DONE CLAIMING");
+
+            mine_count++;
 
             print_status();
 
             await countdown(3 * 1000, "waiting a little"); // sleep additional secs
         }
         catch (error) {
-            localStorage.removeItem("miner_last_mine_data");
-
             const alien_error = error?.json?.error;
             if (alien_error && error?.json?.error?.name === "tx_cpu_usage_exceeded") {
                 miner.print(alien_error?.what || alien_error);
                 cpu_fails++;
                 print_status();
-                await countdown(20 * 60 * 1000, "CPU cooldown");
+                await countdown(12 * 60 * 1000, "CPU cooldown");
                 continue;
             }
 
@@ -523,6 +539,7 @@ var my_mine_loop = async function () {
         }
     }
 }
+
 
 var main = async function () {
     await wait_for_msg("Loaded HomeScene");
