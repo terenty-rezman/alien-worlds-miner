@@ -294,8 +294,7 @@ var test_popup_close = async function () {
     console.log("POPUP CLOSED !")
 }
 
-var my_background_mine = async (account) => {
-    return new Promise(async (resolve, reject) => {
+var my_background_mine = async (account, timeout_ms) => {
         let bagDifficulty = await getBagDifficulty(account);
         bagDifficulty = parseInt(bagDifficulty) || 0; // [!]
         
@@ -308,27 +307,18 @@ var my_background_mine = async (account) => {
         console.log('start doWork = ' + Date.now());
         const last_mine_tx = await lastMineTx(mining_account, account, wax.api.rpc);
 
-        doWorkWorker({ mining_account, account, difficulty, last_mine_tx }).then(
-            (mine_work) => {
-                console.log('end doWork = ' + Date.now());
-                resolve(mine_work);
-            }
-        );
-    });
+        return await doWorkWorker({ mining_account, account, difficulty, last_mine_tx });
 };
 
-var my_mine = function (account) {
-    return new Promise((resolve, reject) => {
-        try {
-            my_background_mine(account).then((mine_work) => {
-                unityInstance.SendMessage('Controller', 'Server_Response_Mine', JSON.stringify(mine_work));
-                resolve(JSON.stringify(mine_work));
-            });
-        } catch (error) {
-            unityInstance.SendMessage('ErrorHandler', 'Server_Response_SetErrorData', error.message);
-            reject(error.message);
-        }
-    });
+var my_mine = async function (account, timeout_ms) {
+    try {
+        const mine_work = await my_background_mine(account, timeout_ms);
+        unityInstance.SendMessage('Controller', 'Server_Response_Mine', JSON.stringify(mine_work));
+        return JSON.stringify(mine_work);
+    } catch (error) {
+        unityInstance.SendMessage('ErrorHandler', 'Server_Response_SetErrorData', error.message);
+        throw error;
+    }
 }
 
 var my_claim = async function (data) {
