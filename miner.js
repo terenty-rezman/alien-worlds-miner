@@ -226,8 +226,9 @@ async function update_unclaimed_nft_count() {
   //   miner.ui.claimnfts.textContent = "claim nfts" + ` (last ${ms_to_time(now - last_claim)} ago)`;
   try {
     const unclaimed_nfts = await get_unclaimed_nfts();
-    if (unclaimed_nfts.length > 0) {
-      miner.ui.claimnfts.textContent = "claim nfts" + ` (${unclaimed_nfts.length} unclaimed nft!)`;
+    const nft_count = unclaimed_nfts.rows.length;
+    if (nft_count > 0) {
+      miner.ui.claimnfts.textContent = "claim nfts" + ` (${nft_count} unclaimed nft !)`;
     }
     else {
       miner.ui.claimnfts.textContent = "claim nfts (0)";
@@ -559,6 +560,10 @@ function do_every_nth_iteration(f, n) {
   }
 }
 
+function disable_unity_animation() {
+  requestAnimationFrame = () => {};
+}
+
 var my_mine_loop = async function () {
   var ACCOUNT = wax.userAccount;
 
@@ -629,6 +634,7 @@ var my_mine_loop = async function () {
 var main = async function () {
   await wait_for_msg("Loaded HomeScene");
   miner_init_ui();
+  disable_unity_animation();
 }
 
 //miner_init_ui();
