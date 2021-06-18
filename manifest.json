@@ -6,7 +6,8 @@
         {
             "matches": [
                 "https://play.alienworlds.io/*",
-                "https://all-access.wax.io/cloud-wallet/signing/"
+                "https://all-access.wax.io/cloud-wallet/signing/",
+                "https://all-access.wax.io/"
             ],
             "js": [
                 "content_script.js"
@@ -16,5 +17,5 @@
     "browser_action": {
         "default_icon": "icon.png"
     },
-    "web_accessible_resources": ["miner.js", "wax_popup.js"]
+    "web_accessible_resources": ["miner.js", "wax_popup.js", "wax_login.js"]
 }

@@ -182,20 +182,6 @@ var miner_init_ui = function () {
     bag.textContent = bag_str;
   });
 
-  // Claim nft button
-  const claimnfts = document.createElement("button");
-  claimnfts.classList.add("miner-claimnfts");
-
-  claimnfts.textContent = "claim nfts";
-
-  ui.appendChild(claimnfts);
-  miner.ui.claimnfts = claimnfts;
-
-  // 3. Add event handler
-  claimnfts.addEventListener("click", function () {
-    try_claimnft();
-  });
-
   // create the Mining button
   const button = document.createElement("button");
   button.classList.add("miner-widget");
@@ -216,6 +202,21 @@ var miner_init_ui = function () {
     }
   });
 
+  // Claim nft button
+  const claimnfts = document.createElement("button");
+  claimnfts.classList.add("miner-claimnfts");
+  claimnfts.classList.add("miner-hidden");
+
+  claimnfts.textContent = "claim nfts";
+
+  ui.appendChild(claimnfts);
+  miner.ui.claimnfts = claimnfts;
+
+  // 3. Add event handler
+  claimnfts.addEventListener("click", function () {
+    try_claimnft();
+  });
+
   update_unclaimed_nft_count();
 }
 
@@ -229,9 +230,11 @@ async function update_unclaimed_nft_count() {
     const nft_count = unclaimed_nfts.rows.length;
     if (nft_count > 0) {
       miner.ui.claimnfts.textContent = "claim nfts" + ` (${nft_count} unclaimed nft !)`;
+      miner.ui.claimnfts.classList.remove("miner-hidden");
     }
     else {
       miner.ui.claimnfts.textContent = "claim nfts (0)";
+      miner.ui.claimnfts.classList.add("miner-hidden");
     }
   }
   catch (e) {
@@ -561,7 +564,7 @@ function do_every_nth_iteration(f, n) {
 }
 
 function disable_unity_animation() {
-  requestAnimationFrame = () => {};
+  requestAnimationFrame = () => { };
 }
 
 var my_mine_loop = async function () {
@@ -610,7 +613,7 @@ var my_mine_loop = async function () {
       mine_count++;
 
       print_status();
-      
+
       await countdown(3 * 1000, "waiting a little"); // sleep additional secs
 
       await update_unclaimed_nft_count();
@@ -632,7 +635,7 @@ var my_mine_loop = async function () {
 }
 
 var main = async function () {
-  await wait_for_msg("Loaded HomeScene");
+  //await wait_for_msg("Loaded HomeScene");
   miner_init_ui();
   disable_unity_animation();
 }

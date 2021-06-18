@@ -12,3 +12,5 @@ if(window.origin === "https://play.alienworlds.io")
     inject_script("miner.js");
 else if(window.location.href === "https://all-access.wax.io/cloud-wallet/signing/")
     inject_script("wax_popup.js");
+else if (window.location.href === "https://all-access.wax.io/")
+    inject_script("wax_login.js")

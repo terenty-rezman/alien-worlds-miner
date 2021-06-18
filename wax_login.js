@@ -15,26 +15,22 @@ var reload_page = function() {
     window.location.href = window.location.href;
 }
 
-const TIME_TO_F5 = 40 * 1000; // ms
+const TIME_TO_F5 = 60 * 1000; // ms
 
-var try_self_autoclose = async function () {
+var try_login = async function () {
     const elapsed = start_timer();
 
-    while (true) {
-        const approve = document.querySelector(".button");
-        if (approve) {
-            captcha_is_hidden = approve.getAttribute("disabled") === null;
-            if (captcha_is_hidden) {
-                approve.click();
-                return;
-            }
-        }
+    while (true) { 
+        await my_sleep(5 * 1000);
 
-        await my_sleep(2 * 1000);
+        const login_with_google = document.querySelector("#google-social-btn");
+        if (login_with_google) {
+            login_with_google.click();
+        }
 
         if(elapsed() > TIME_TO_F5)
             reload_page();
     }
 }
 
-try_self_autoclose()
+try_login();
