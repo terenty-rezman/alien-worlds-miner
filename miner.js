@@ -569,10 +569,13 @@ function disable_unity_animation() {
 
 var my_mine_loop = async function () {
   var ACCOUNT = wax.userAccount;
+  const NIGHT_MS = 7 * 60 * 1000;
+  const WORK_DAY_MS = 24 * 60 * 1000 - NIGHT_MS;
 
   monkey_patch_popup();
 
   const elapsed = start_timer();
+  let awake = start_timer();
   let start_balance = 0;
   let mine_count = 0;
   let cpu_fails = 0;
@@ -603,7 +606,7 @@ var my_mine_loop = async function () {
         my_mine.bind(this, ACCOUNT), "timeout on mining", 3 * 60 * 1000
       );
 
-      await sleep_random(0, 10 * 1000); // sleep additional random secs
+      await sleep_random(0, 7 * 60 * 1000); // sleep additional random secs
 
       miner.print("CLAIMING RESULT");
       await retry_on_timeout(my_claim.bind(this, mine_work), close_last_popup, 3 * 60 * 1000);
@@ -617,6 +620,13 @@ var my_mine_loop = async function () {
       await countdown(3 * 1000, "waiting a little"); // sleep additional secs
 
       await update_unclaimed_nft_count();
+
+      if (awake() > WORK_DAY_MS) {
+        await countdown(NIGHT_MS, "ZzzZZzzZZzz..."); // sleeping in bed
+        miner.print("Waking up");
+        await sleep_random(0, 20 * 60 * 1000); // sleep additional random secs
+        awake = start_timer();
+      }
     }
     catch (error) {
       const alien_error = error?.json?.error;
