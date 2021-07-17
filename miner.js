@@ -567,10 +567,15 @@ function disable_unity_animation() {
   requestAnimationFrame = () => { };
 }
 
+function change_wax_endpoint() {
+  wax.rpc.endpoint = "https://chain.wax.io";
+  console.log("wax endpoint set to", wax.rpc.endpoint);
+}
+
 var my_mine_loop = async function () {
   var ACCOUNT = wax.userAccount;
-  const NIGHT_MS = 7 * 60 * 1000;
-  const WORK_DAY_MS = 24 * 60 * 1000 - NIGHT_MS;
+  const NIGHT_MS = 7 * 60 * 60 * 1000;
+  const WORK_DAY_MS = 24 * 60 * 60 * 1000 - NIGHT_MS;
 
   monkey_patch_popup();
 
@@ -606,7 +611,7 @@ var my_mine_loop = async function () {
         my_mine.bind(this, ACCOUNT), "timeout on mining", 3 * 60 * 1000
       );
 
-      await sleep_random(0, 7 * 60 * 1000); // sleep additional random secs
+      await sleep_random(0, 2 * 60 * 1000); // sleep additional random secs
 
       miner.print("CLAIMING RESULT");
       await retry_on_timeout(my_claim.bind(this, mine_work), close_last_popup, 3 * 60 * 1000);
@@ -645,9 +650,11 @@ var my_mine_loop = async function () {
 }
 
 var main = async function () {
-  //await wait_for_msg("Loaded HomeScene");
+  // await wait_for_msg("Loaded HomeScene");
   miner_init_ui();
   disable_unity_animation();
+  await wait_for_msg("Input Manager initialize...");
+  change_wax_endpoint();
 }
 
 //miner_init_ui();
