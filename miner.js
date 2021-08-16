@@ -576,6 +576,7 @@ var my_mine_loop = async function () {
   var ACCOUNT = wax.userAccount;
   const NIGHT_MS = 7 * 60 * 60 * 1000;
   const WORK_DAY_MS = 24 * 60 * 60 * 1000 - NIGHT_MS;
+  const ENABLE_SLEEP = true;
 
   monkey_patch_popup();
 
@@ -626,7 +627,7 @@ var my_mine_loop = async function () {
 
       await update_unclaimed_nft_count();
 
-      if (awake() > WORK_DAY_MS) {
+      if (ENABLE_SLEEP && awake() > WORK_DAY_MS) {
         await countdown(NIGHT_MS, "ZzzZZzzZZzz..."); // sleeping in bed
         miner.print("Waking up");
         await sleep_random(0, 20 * 60 * 1000); // sleep additional random secs
