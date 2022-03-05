@@ -52,13 +52,24 @@ var wait_for_msg = async function (msg) {
   })
 }
 
+var wait_for_elem = async function(selector) {
+  while(true) {
+    const item = document.querySelector(selector);
+
+    if(item) 
+      return item;
+    else 
+      await my_sleep(500);
+  }
+}
+
 var miner_init_ui = function () {
   // Create our stylesheet
   const style = document.createElement('style');
   style.innerHTML =
     `
         .miner-ui-container {
-            position: absolute;
+            position: fixed;
             margins: 0px;
             border: none;
             outline: none;
@@ -71,8 +82,8 @@ var miner_init_ui = function () {
 
             display: flex;
             flex-direction: column-reverse;
-            align-items: flex-start;
-            z-index: 1000;
+            align-items: flex-end;
+            z-index: 10000;
         }
 
         .miner-statusbar {
@@ -349,7 +360,8 @@ var my_mine_loop = async function () {
 }
 
 var main = async function () {
-  await wait_for_msg("Navigating to inventory");
+  // await wait_for_msg("Navigating to inventory");
+  await wait_for_elem(".chakra-container");
   miner_init_ui();
 }
 
